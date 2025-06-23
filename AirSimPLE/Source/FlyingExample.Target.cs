@@ -9,8 +9,10 @@ public class FlyingExampleTarget : TargetRules
 	{
 		Type = TargetType.Game;
 		ExtraModuleNames.AddRange(new string[] { "AirSimPLE" });
-		DefaultBuildSettings = BuildSettingsVersion.V2;
-        IncludeOrderVersion = EngineIncludeOrderVersion.Unreal5_2;
+		DefaultBuildSettings = BuildSettingsVersion.V5;
+		IncludeOrderVersion = EngineIncludeOrderVersion.Unreal5_6;
+		CppStandard = CppStandardVersion.Cpp20;
+		// BuildEnvironment = TargetBuildEnvironment.Unique;
 
 		if (Target.Platform == UnrealTargetPlatform.Linux)
 			bUsePCHFiles = false;
