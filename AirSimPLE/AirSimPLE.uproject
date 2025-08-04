@@ -16,16 +16,12 @@
 			"Enabled": true
 		},
 		{
-			"Name": "DroneRacing",
-			"Enabled": false
+			"Name": "ModularGameplay",
+			"Enabled": true
 		},
 		{
-			"Name": "Building99",
-			"Enabled": false
-		},
-		{
-			"Name": "MSBuild2018",
-			"Enabled": false
+			"Name": "GameFeatures",
+			"Enabled": true
 		}
 	],
 	"TargetPlatforms": [
