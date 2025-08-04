@@ -18,18 +18,46 @@ git lfs pull
 
 ## Build the Project through Command Line
 
-Required Software (Tested with the following on Windows 11):
+### Required Software (Tested with the following on Windows 11):
 + Unreal Engine 5.2 https://www.unrealengine.com/en-US/unreal-engine-5
-+ Microsoft Visual Studio 2022 Community Version https://visualstudio.microsoft.com/vs/community/
++ Microsoft Visual Studio 2022 Community Version https://visualstudio.microsoft.com/vs/community/  
+  We tested the following required workloads and individual components suggested by [Unreal Engine 5.2 documentation].
+  - Workloads:
+    * .Net desktop development
+    * Desktop development with C++
+    * Universal Windows Platform development
+    * Game development with C++
+  - Individual Components:
+    * MSVC v143 - VS 2022 C++ x64/x86 build tools (**v14.38-17.8**)
+    * Windows 10 SDK (**10.0.18362.0**)
+    * Unreal Engine installer
+
+[Unreal Engine 5.2 documentation]: https://dev.epicgames.com/documentation/en-us/unreal-engine/setting-up-visual-studio-development-environment-for-cplusplus-projects-in-unreal-engine?application_version=5.2
+
+
+### Build Configurations
+
+To specify the particular version of the tool chain for building, please create or modify the following file `Documents/Unreal Engine/UnrealBuildTool/BuildConfiguration.xml` with the following:
+
+```xml
+<?xml version="1.0" encoding="utf-8" ?>
+<Configuration xmlns="https://www.unrealengine.com/BuildConfiguration">
+    <WindowsPlatform>
+        <CompilerVersion>14.38.33145</CompilerVersion>
+    </WindowsPlatform>
+</Configuration>
+```
+
+**NOTE**: We provide a copy in `AirSimPLE/Saved/UnrealBuildTool/BuildConfiguration.xml` as suggested in [Unreal Engine 5.2 Build Configuration]. This is however not working for Unreal Engine 5.2.1 so far. We therefore suggest copying the file to the folder `Documents/Unreal Engine/UnrealBuildTool/`.
+
+[Unreal Engine 5.2 Build Configuration]: https://dev.epicgames.com/documentation/en-us/unreal-engine/build-configuration-for-unreal-engine?application_version=5.2
+ 
+
+### Build Command
 
 If you are building under Windows CMD, run the command
 ```bat
 build-game.cmd
-```
-
-If you are building under Window Subsystem for Linux (WSL), run the following command under `airsimple-repo`
-```shell
-./build.WSL2.bash
 ```
 
 It may take 20~30 minutes to build the game. Once the build is successful, you should be able to find the executable `FlyingExample.exe` under the `AirSimPLE\Binaries\Win64` folder.
