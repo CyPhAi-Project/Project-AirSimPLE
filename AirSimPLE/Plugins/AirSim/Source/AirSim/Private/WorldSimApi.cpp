@@ -14,10 +14,10 @@
 #include <ctime>
 #include <algorithm>
 
-WorldSimApi::WorldSimApi(ASimModeBase* simmode)
+WorldSimApi::WorldSimApi(ASimModeBase *simmode)
     : simmode_(simmode) {}
 
-bool WorldSimApi::loadLevel(const std::string& level_name)
+bool WorldSimApi::loadLevel(const std::string &level_name)
 {
     bool success;
     using namespace std::chrono_literals;
@@ -25,15 +25,13 @@ bool WorldSimApi::loadLevel(const std::string& level_name)
     // Add loading screen to viewport
     simmode_->toggleLoadingScreen(true);
     std::this_thread::sleep_for(0.1s);
-    UAirBlueprintLib::RunCommandOnGameThread([this, level_name, &success]() {
-        success = UAirBlueprintLib::loadLevel(this->simmode_->GetWorld(), FString(level_name.c_str()));
-    },
+    UAirBlueprintLib::RunCommandOnGameThread([this, level_name, &success]()
+                                             { success = UAirBlueprintLib::loadLevel(this->simmode_->GetWorld(), FString(level_name.c_str())); },
                                              true);
 
-    //Remove Loading screen from viewport
-    UAirBlueprintLib::RunCommandOnGameThread([this, level_name]() {
-        this->simmode_->OnLevelLoaded.Broadcast();
-    },
+    // Remove Loading screen from viewport
+    UAirBlueprintLib::RunCommandOnGameThread([this, level_name]()
+                                             { this->simmode_->OnLevelLoaded.Broadcast(); },
                                              true);
     this->simmode_->toggleLoadingScreen(false);
 
@@ -44,36 +42,37 @@ void WorldSimApi::spawnPlayer()
 {
     using namespace std::chrono_literals;
     UE_LOG(LogTemp, Log, TEXT("spawning player"));
-    bool success{ false };
+    bool success{false};
 
-    UAirBlueprintLib::RunCommandOnGameThread([&]() {
-        success = UAirBlueprintLib::spawnPlayer(this->simmode_->GetWorld());
-    },
+    UAirBlueprintLib::RunCommandOnGameThread([&]()
+                                             { success = UAirBlueprintLib::spawnPlayer(this->simmode_->GetWorld()); },
                                              true);
 
-    if (!success) {
+    if (!success)
+    {
         UE_LOG(LogTemp, Error, TEXT("Could not find valid PlayerStart Position"));
     }
-    else {
+    else
+    {
         std::this_thread::sleep_for(1s);
         simmode_->reset();
     }
 }
 
-bool WorldSimApi::destroyObject(const std::string& object_name)
+bool WorldSimApi::destroyObject(const std::string &object_name)
 {
-    bool result{ false };
-    UAirBlueprintLib::RunCommandOnGameThread([this, &object_name, &result]() {
+    bool result{false};
+    UAirBlueprintLib::RunCommandOnGameThread([this, &object_name, &result]()
+                                             {
         AActor* actor = UAirBlueprintLib::FindActor<AActor>(simmode_, FString(object_name.c_str()));
         if (actor) {
             actor->Destroy();
-            result = actor->IsPendingKill();
+            result = actor->IsPendingKillPending();
         }
         if (result)
             simmode_->scene_object_map.Remove(FString(object_name.c_str()));
 
-        GEngine->ForceGarbageCollection(true);
-    },
+        GEngine->ForceGarbageCollection(true); },
                                              true);
     return result;
 }
@@ -82,19 +81,21 @@ std::vector<std::string> WorldSimApi::listAssets() const
 {
     std::vector<std::string> all_assets;
 
-    for (const TPair<FString, FAssetData>& pair : simmode_->asset_map) {
+    for (const TPair<FString, FAssetData> &pair : simmode_->asset_map)
+    {
         all_assets.push_back(std::string(TCHAR_TO_UTF8(*pair.Key)));
     }
 
     return all_assets;
 }
 
-std::string WorldSimApi::spawnObject(const std::string& object_name, const std::string& load_object, const WorldSimApi::Pose& pose, const WorldSimApi::Vector3r& scale, bool physics_enabled, bool is_blueprint)
+std::string WorldSimApi::spawnObject(const std::string &object_name, const std::string &load_object, const WorldSimApi::Pose &pose, const WorldSimApi::Vector3r &scale, bool physics_enabled, bool is_blueprint)
 {
     FString asset_name(load_object.c_str());
-    FAssetData* load_asset = simmode_->asset_map.Find(asset_name);
+    FAssetData *load_asset = simmode_->asset_map.Find(asset_name);
 
-    if (!load_asset->IsValid()) {
+    if (!load_asset->IsValid())
+    {
         throw std::invalid_argument("There were no objects with name " + load_object + " found in the Registry");
     }
 
@@ -104,7 +105,8 @@ std::string WorldSimApi::spawnObject(const std::string& object_name, const std::
     bool spawned_object = false;
     std::string final_object_name = object_name;
 
-    UAirBlueprintLib::RunCommandOnGameThread([this, load_asset, &final_object_name, &spawned_object, &actor_transform, &scale, &physics_enabled, &is_blueprint]() {
+    UAirBlueprintLib::RunCommandOnGameThread([this, load_asset, &final_object_name, &spawned_object, &actor_transform, &scale, &physics_enabled, &is_blueprint]()
+                                             {
         // Ensure new non-matching name for the object
         std::vector<std::string> matching_names = UAirBlueprintLib::ListMatchingActors(simmode_, ".*" + final_object_name + ".*");
         if (matching_names.size() > 0) {
@@ -136,23 +138,24 @@ std::string WorldSimApi::spawnObject(const std::string& object_name, const std::
             simmode_->scene_object_map.Add(FString(final_object_name.c_str()), NewActor);
         }
 
-        UAirBlueprintLib::setSimulatePhysics(NewActor, physics_enabled);
-    },
+        UAirBlueprintLib::setSimulatePhysics(NewActor, physics_enabled); },
                                              true);
 
-    if (!spawned_object) {
+    if (!spawned_object)
+    {
         throw std::invalid_argument(
             "Engine could not spawn " + load_object + " because of a stale reference of same name");
     }
     return final_object_name;
 }
 
-AActor* WorldSimApi::createNewStaticMeshActor(const FActorSpawnParameters& spawn_params, const FTransform& actor_transform, const Vector3r& scale, UStaticMesh* static_mesh)
+AActor *WorldSimApi::createNewStaticMeshActor(const FActorSpawnParameters &spawn_params, const FTransform &actor_transform, const Vector3r &scale, UStaticMesh *static_mesh)
 {
-    AActor* NewActor = simmode_->GetWorld()->SpawnActor<AActor>(AActor::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, spawn_params);
+    AActor *NewActor = simmode_->GetWorld()->SpawnActor<AActor>(AActor::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, spawn_params);
 
-    if (IsValid(NewActor)) {
-        UStaticMeshComponent* ObjectComponent = NewObject<UStaticMeshComponent>(NewActor);
+    if (IsValid(NewActor))
+    {
+        UStaticMeshComponent *ObjectComponent = NewObject<UStaticMeshComponent>(NewActor);
         ObjectComponent->SetStaticMesh(static_mesh);
         ObjectComponent->SetRelativeLocation(FVector(0, 0, 0));
         ObjectComponent->SetWorldScale3D(FVector(scale[0], scale[1], scale[2]));
@@ -164,34 +167,35 @@ AActor* WorldSimApi::createNewStaticMeshActor(const FActorSpawnParameters& spawn
     return NewActor;
 }
 
-AActor* WorldSimApi::createNewBPActor(const FActorSpawnParameters& spawn_params, const FTransform& actor_transform, const Vector3r& scale, UBlueprint* blueprint)
+AActor *WorldSimApi::createNewBPActor(const FActorSpawnParameters &spawn_params, const FTransform &actor_transform, const Vector3r &scale, UBlueprint *blueprint)
 {
-    UClass* new_bp = static_cast<UClass*>(blueprint->GeneratedClass);
-    AActor* new_actor = simmode_->GetWorld()->SpawnActor<AActor>(new_bp, FVector::ZeroVector, FRotator::ZeroRotator, spawn_params);
+    UClass *new_bp = static_cast<UClass *>(blueprint->GeneratedClass);
+    AActor *new_actor = simmode_->GetWorld()->SpawnActor<AActor>(new_bp, FVector::ZeroVector, FRotator::ZeroRotator, spawn_params);
 
-    if (new_actor) {
+    if (new_actor)
+    {
         new_actor->SetActorLocationAndRotation(actor_transform.GetLocation(), actor_transform.GetRotation(), false, nullptr, ETeleportType::TeleportPhysics);
     }
     return new_actor;
 }
 
-bool WorldSimApi::setLightIntensity(const std::string& light_name, float intensity)
+bool WorldSimApi::setLightIntensity(const std::string &light_name, float intensity)
 {
     bool result = false;
-    UAirBlueprintLib::RunCommandOnGameThread([this, &light_name, &intensity, &result]() {
+    UAirBlueprintLib::RunCommandOnGameThread([this, &light_name, &intensity, &result]()
+                                             {
         AActor* light_actor = simmode_->scene_object_map.FindRef(FString(light_name.c_str()));
 
         if (light_actor) {
             const FString command = FString::Printf(TEXT("SetIntensity %f"), intensity);
             FOutputDeviceNull ar;
             result = light_actor->CallFunctionByNameWithArguments(*command, ar, nullptr, true);
-        }
-    },
+        } },
                                              true);
     return result;
 }
 
-bool WorldSimApi::createVoxelGrid(const Vector3r& position, const int& x_size, const int& y_size, const int& z_size, const float& res, const std::string& output_file)
+bool WorldSimApi::createVoxelGrid(const Vector3r &position, const int &x_size, const int &y_size, const int &z_size, const float &res, const std::string &output_file)
 {
     bool success = false;
     int ncells_x = x_size / res;
@@ -206,9 +210,12 @@ bool WorldSimApi::createVoxelGrid(const Vector3r& position, const int& x_size, c
     params.bTraceComplex = false;
     params.TraceTag = "";
     auto position_in_UE_frame = simmode_->getGlobalNedTransform().fromGlobalNed(position);
-    for (float i = 0; i < ncells_x; i++) {
-        for (float k = 0; k < ncells_z; k++) {
-            for (float j = 0; j < ncells_y; j++) {
+    for (float i = 0; i < ncells_x; i++)
+    {
+        for (float k = 0; k < ncells_z; k++)
+        {
+            for (float j = 0; j < ncells_y; j++)
+            {
                 int idx = i + ncells_x * (k + ncells_z * j);
                 FVector vposition = FVector((i - ncells_x / 2) * scale_cm, (j - ncells_y / 2) * scale_cm, (k - ncells_z / 2) * scale_cm) + position_in_UE_frame;
                 voxel_grid_[idx] = simmode_->GetWorld()->OverlapBlockingTestByChannel(vposition, FQuat::Identity, ECollisionChannel::ECC_Pawn, FCollisionShape::MakeBox(FVector(scale_cm / 2)), params);
@@ -217,7 +224,8 @@ bool WorldSimApi::createVoxelGrid(const Vector3r& position, const int& x_size, c
     }
 
     std::ofstream output(output_file, std::ios::out | std::ios::binary);
-    if (!output.good()) {
+    if (!output.good())
+    {
         UE_LOG(LogTemp, Error, TEXT("Could not open output file to write voxel grid!"));
         return success;
     }
@@ -231,17 +239,21 @@ bool WorldSimApi::createVoxelGrid(const Vector3r& position, const int& x_size, c
     output << "data\n";
     bool run_value = voxel_grid_[0];
     unsigned int run_length = 0;
-    for (size_t i = 0; i < voxel_grid_.size(); ++i) {
-        if (voxel_grid_[i] == run_value) {
+    for (size_t i = 0; i < voxel_grid_.size(); ++i)
+    {
+        if (voxel_grid_[i] == run_value)
+        {
             // This is a run (repeated bit value)
             run_length++;
-            if (run_length == 255) {
+            if (run_length == 255)
+            {
                 output << static_cast<char>(run_value);
                 output << static_cast<char>(run_length);
                 run_length = 0;
             }
         }
-        else {
+        else
+        {
             // End of a run
             output << static_cast<char>(run_value);
             output << static_cast<char>(run_length);
@@ -249,7 +261,8 @@ bool WorldSimApi::createVoxelGrid(const Vector3r& position, const int& x_size, c
             run_length = 1;
         }
     }
-    if (run_length > 0) {
+    if (run_length > 0)
+    {
         output << static_cast<char>(run_value);
         output << static_cast<char>(run_length);
     }
@@ -265,9 +278,8 @@ bool WorldSimApi::isPaused() const
 
 void WorldSimApi::reset()
 {
-    UAirBlueprintLib::RunCommandOnGameThread([this]() {
-        simmode_->reset();
-    },
+    UAirBlueprintLib::RunCommandOnGameThread([this]()
+                                             { simmode_->reset(); },
                                              true);
 }
 
@@ -286,101 +298,98 @@ void WorldSimApi::continueForFrames(uint32_t frames)
     simmode_->continueForFrames(frames);
 }
 
-void WorldSimApi::setTimeOfDay(bool is_enabled, const std::string& start_datetime, bool is_start_datetime_dst,
+void WorldSimApi::setTimeOfDay(bool is_enabled, const std::string &start_datetime, bool is_start_datetime_dst,
                                float celestial_clock_speed, float update_interval_secs, bool move_sun)
 {
     simmode_->setTimeOfDay(is_enabled, start_datetime, is_start_datetime_dst, celestial_clock_speed, update_interval_secs, move_sun);
 }
 
-bool WorldSimApi::addVehicle(const std::string& vehicle_name, const std::string& vehicle_type, const Pose& pose, const std::string& pawn_path)
+bool WorldSimApi::addVehicle(const std::string &vehicle_name, const std::string &vehicle_type, const Pose &pose, const std::string &pawn_path)
 {
     bool result;
-    UAirBlueprintLib::RunCommandOnGameThread([&]() {
-        result = simmode_->createVehicleAtRuntime(vehicle_name, vehicle_type, pose, pawn_path);
-    },
+    UAirBlueprintLib::RunCommandOnGameThread([&]()
+                                             { result = simmode_->createVehicleAtRuntime(vehicle_name, vehicle_type, pose, pawn_path); },
                                              true);
 
     return result;
 }
 
-bool WorldSimApi::setSegmentationObjectID(const std::string& mesh_name, int object_id, bool is_name_regex)
+bool WorldSimApi::setSegmentationObjectID(const std::string &mesh_name, int object_id, bool is_name_regex)
 {
     bool success;
-    UAirBlueprintLib::RunCommandOnGameThread([mesh_name, object_id, is_name_regex, &success]() {
-        success = UAirBlueprintLib::SetMeshStencilID(mesh_name, object_id, is_name_regex);
-    },
+    UAirBlueprintLib::RunCommandOnGameThread([mesh_name, object_id, is_name_regex, &success]()
+                                             { success = UAirBlueprintLib::SetMeshStencilID(mesh_name, object_id, is_name_regex); },
                                              true);
     return success;
 }
 
-int WorldSimApi::getSegmentationObjectID(const std::string& mesh_name) const
+int WorldSimApi::getSegmentationObjectID(const std::string &mesh_name) const
 {
     int result;
-    UAirBlueprintLib::RunCommandOnGameThread([&mesh_name, &result]() {
-        result = UAirBlueprintLib::GetMeshStencilID(mesh_name);
-    },
+    UAirBlueprintLib::RunCommandOnGameThread([&mesh_name, &result]()
+                                             { result = UAirBlueprintLib::GetMeshStencilID(mesh_name); },
                                              true);
     return result;
 }
 
-void WorldSimApi::printLogMessage(const std::string& message,
-                                  const std::string& message_param, unsigned char severity)
+void WorldSimApi::printLogMessage(const std::string &message,
+                                  const std::string &message_param, unsigned char severity)
 {
     UAirBlueprintLib::LogMessageString(message, message_param, static_cast<LogDebugLevel>(severity));
 }
 
-std::vector<std::string> WorldSimApi::listSceneObjects(const std::string& name_regex) const
+std::vector<std::string> WorldSimApi::listSceneObjects(const std::string &name_regex) const
 {
     std::vector<std::string> result;
-    UAirBlueprintLib::RunCommandOnGameThread([this, &name_regex, &result]() {
-        result = UAirBlueprintLib::ListMatchingActors(simmode_, name_regex);
-    },
+    UAirBlueprintLib::RunCommandOnGameThread([this, &name_regex, &result]()
+                                             { result = UAirBlueprintLib::ListMatchingActors(simmode_, name_regex); },
                                              true);
     return result;
 }
 
-bool WorldSimApi::runConsoleCommand(const std::string& command)
+bool WorldSimApi::runConsoleCommand(const std::string &command)
 {
     bool succeeded = false;
-    UAirBlueprintLib::RunCommandOnGameThread([this, &command, &succeeded]() {
+    UAirBlueprintLib::RunCommandOnGameThread([this, &command, &succeeded]()
+                                             {
         FString fStringCommand(command.c_str());
-        succeeded = UAirBlueprintLib::RunConsoleCommand(simmode_, fStringCommand);
-    },
+        succeeded = UAirBlueprintLib::RunConsoleCommand(simmode_, fStringCommand); },
                                              true);
     return succeeded;
 }
 
-WorldSimApi::Pose WorldSimApi::getObjectPose(const std::string& object_name) const
+WorldSimApi::Pose WorldSimApi::getObjectPose(const std::string &object_name) const
 {
     Pose result;
-    UAirBlueprintLib::RunCommandOnGameThread([this, &object_name, &result]() {
+    UAirBlueprintLib::RunCommandOnGameThread([this, &object_name, &result]()
+                                             {
         // AActor* actor = UAirBlueprintLib::FindActor<AActor>(simmode_, FString(object_name.c_str()));
         AActor* actor = simmode_->scene_object_map.FindRef(FString(object_name.c_str()));
         result = actor ? simmode_->getGlobalNedTransform().toGlobalNed(FTransform(actor->GetActorRotation(), actor->GetActorLocation()))
-                       : Pose::nanPose();
-    },
+                       : Pose::nanPose(); },
                                              true);
 
     return result;
 }
 
-WorldSimApi::Vector3r WorldSimApi::getObjectScale(const std::string& object_name) const
+WorldSimApi::Vector3r WorldSimApi::getObjectScale(const std::string &object_name) const
 {
     Vector3r result;
-    UAirBlueprintLib::RunCommandOnGameThread([this, &object_name, &result]() {
+    UAirBlueprintLib::RunCommandOnGameThread([this, &object_name, &result]()
+                                             {
         // AActor* actor = UAirBlueprintLib::FindActor<AActor>(simmode_, FString(object_name.c_str()));
         AActor* actor = simmode_->scene_object_map.FindRef(FString(object_name.c_str()));
         result = actor ? Vector3r(actor->GetActorScale().X, actor->GetActorScale().Y, actor->GetActorScale().Z)
-                       : Vector3r::Zero();
-    },
+                       : Vector3r::Zero(); },
                                              true);
     return result;
 }
 
-bool WorldSimApi::setObjectPose(const std::string& object_name, const WorldSimApi::Pose& pose, bool teleport)
+bool WorldSimApi::setObjectPose(const std::string &object_name, const WorldSimApi::Pose &pose, bool teleport)
 {
     bool result;
-    UAirBlueprintLib::RunCommandOnGameThread([this, &object_name, &pose, teleport, &result]() {
+    UAirBlueprintLib::RunCommandOnGameThread([this, &object_name, &pose, teleport, &result]()
+                                             {
         FTransform actor_transform = simmode_->getGlobalNedTransform().fromGlobalNed(pose);
         // AActor* actor = UAirBlueprintLib::FindActor<AActor>(simmode_, FString(object_name.c_str()));
         AActor* actor = simmode_->scene_object_map.FindRef(FString(object_name.c_str()));
@@ -391,16 +400,16 @@ bool WorldSimApi::setObjectPose(const std::string& object_name, const WorldSimAp
                 result = actor->SetActorLocationAndRotation(actor_transform.GetLocation(), actor_transform.GetRotation(), true);
         }
         else
-            result = false;
-    },
+            result = false; },
                                              true);
     return result;
 }
 
-bool WorldSimApi::setObjectScale(const std::string& object_name, const Vector3r& scale)
+bool WorldSimApi::setObjectScale(const std::string &object_name, const Vector3r &scale)
 {
     bool result;
-    UAirBlueprintLib::RunCommandOnGameThread([this, &object_name, &scale, &result]() {
+    UAirBlueprintLib::RunCommandOnGameThread([this, &object_name, &scale, &result]()
+                                             {
         // AActor* actor = UAirBlueprintLib::FindActor<AActor>(simmode_, FString(object_name.c_str()));
         AActor* actor = simmode_->scene_object_map.FindRef(FString(object_name.c_str()));
         if (actor) {
@@ -408,17 +417,15 @@ bool WorldSimApi::setObjectScale(const std::string& object_name, const Vector3r&
             result = true;
         }
         else
-            result = false;
-    },
+            result = false; },
                                              true);
     return result;
 }
 
 void WorldSimApi::enableWeather(bool enable)
 {
-    UAirBlueprintLib::RunCommandOnGameThread([this, enable]() {
-        UWeatherLib::setWeatherEnabled(simmode_->GetWorld(), enable);
-    },
+    UAirBlueprintLib::RunCommandOnGameThread([this, enable]()
+                                             { UWeatherLib::setWeatherEnabled(simmode_->GetWorld(), enable); },
                                              true);
 }
 
@@ -427,16 +434,16 @@ void WorldSimApi::setWeatherParameter(WeatherParameter param, float val)
     unsigned char param_n = static_cast<unsigned char>(msr::airlib::Utils::toNumeric<WeatherParameter>(param));
     EWeatherParamScalar param_e = msr::airlib::Utils::toEnum<EWeatherParamScalar>(param_n);
 
-    UAirBlueprintLib::RunCommandOnGameThread([this, param_e, val]() {
-        UWeatherLib::setWeatherParamScalar(simmode_->GetWorld(), param_e, val);
-    },
+    UAirBlueprintLib::RunCommandOnGameThread([this, param_e, val]()
+                                             { UWeatherLib::setWeatherParamScalar(simmode_->GetWorld(), param_e, val); },
                                              true);
 }
 
-std::unique_ptr<std::vector<std::string>> WorldSimApi::swapTextures(const std::string& tag, int tex_id, int component_id, int material_id)
+std::unique_ptr<std::vector<std::string>> WorldSimApi::swapTextures(const std::string &tag, int tex_id, int component_id, int material_id)
 {
     auto swappedObjectNames = std::make_unique<std::vector<std::string>>();
-    UAirBlueprintLib::RunCommandOnGameThread([this, &tag, tex_id, component_id, material_id, &swappedObjectNames]() {
+    UAirBlueprintLib::RunCommandOnGameThread([this, &tag, tex_id, component_id, material_id, &swappedObjectNames]()
+                                             {
         //Split the tag string into individual tags.
         TArray<FString> splitTags;
         FString notSplit = FString(tag.c_str());
@@ -463,16 +470,16 @@ std::unique_ptr<std::vector<std::string>> WorldSimApi::swapTextures(const std::s
                 continue;
             dynamic_cast<ATextureShuffleActor*>(shuffler)->SwapTexture(tex_id, component_id, material_id);
             swappedObjectNames->push_back(TCHAR_TO_UTF8(*shuffler->GetName()));
-        }
-    },
+        } },
                                              true);
     return swappedObjectNames;
 }
 
-bool WorldSimApi::setObjectMaterialFromTexture(const std::string& object_name, const std::string& texture_path, const int component_id)
+bool WorldSimApi::setObjectMaterialFromTexture(const std::string &object_name, const std::string &texture_path, const int component_id)
 {
     bool success = false;
-    UAirBlueprintLib::RunCommandOnGameThread([this, &object_name, &texture_path, &success, &component_id]() {
+    UAirBlueprintLib::RunCommandOnGameThread([this, &object_name, &texture_path, &success, &component_id]()
+                                             {
         if (!IsValid(simmode_->domain_rand_material_)) {
             UAirBlueprintLib::LogMessageString("Cannot find material for domain randomization",
                                                "",
@@ -497,17 +504,17 @@ bool WorldSimApi::setObjectMaterialFromTexture(const std::string& object_name, c
                                                    "",
                                                    LogDebugLevel::Failure);
             }
-        }
-    },
+        } },
                                              true);
 
     return success;
 }
 
-bool WorldSimApi::setObjectMaterial(const std::string& object_name, const std::string& material_name, const int component_id)
+bool WorldSimApi::setObjectMaterial(const std::string &object_name, const std::string &material_name, const int component_id)
 {
     bool success = false;
-    UAirBlueprintLib::RunCommandOnGameThread([this, &object_name, &material_name, &success, &component_id]() {
+    UAirBlueprintLib::RunCommandOnGameThread([this, &object_name, &material_name, &success, &component_id]()
+                                             {
         AActor* actor = UAirBlueprintLib::FindActor<AActor>(simmode_, FString(object_name.c_str()));
         UMaterial* material = static_cast<UMaterial*>(StaticLoadObject(UMaterial::StaticClass(), nullptr, *FString(material_name.c_str())));
 
@@ -530,8 +537,7 @@ bool WorldSimApi::setObjectMaterial(const std::string& object_name, const std::s
                                                    "",
                                                    LogDebugLevel::Failure);
             }
-        }
-    },
+        } },
                                              true);
 
     return success;
@@ -540,17 +546,17 @@ bool WorldSimApi::setObjectMaterial(const std::string& object_name, const std::s
 //----------- Plotting APIs ----------/
 void WorldSimApi::simFlushPersistentMarkers()
 {
-    UAirBlueprintLib::RunCommandOnGameThread([this]() {
-        FlushPersistentDebugLines(simmode_->GetWorld());
-    },
+    UAirBlueprintLib::RunCommandOnGameThread([this]()
+                                             { FlushPersistentDebugLines(simmode_->GetWorld()); },
                                              true);
 }
 
-void WorldSimApi::simPlotPoints(const std::vector<Vector3r>& points, const std::vector<float>& color_rgba, float size, float duration, bool is_persistent)
+void WorldSimApi::simPlotPoints(const std::vector<Vector3r> &points, const std::vector<float> &color_rgba, float size, float duration, bool is_persistent)
 {
-    FColor color = FLinearColor{ color_rgba[0], color_rgba[1], color_rgba[2], color_rgba[3] }.ToFColor(true);
+    FColor color = FLinearColor{color_rgba[0], color_rgba[1], color_rgba[2], color_rgba[3]}.ToFColor(true);
 
-    UAirBlueprintLib::RunCommandOnGameThread([this, &points, &color, size, duration, is_persistent]() {
+    UAirBlueprintLib::RunCommandOnGameThread([this, &points, &color, size, duration, is_persistent]()
+                                             {
         for (const auto& point : points) {
             DrawDebugPoint(simmode_->GetWorld(),
                            simmode_->getGlobalNedTransform().fromGlobalNed(point),
@@ -558,17 +564,17 @@ void WorldSimApi::simPlotPoints(const std::vector<Vector3r>& points, const std::
                            color,
                            is_persistent,
                            duration);
-        }
-    },
+        } },
                                              true);
 }
 
 // plot line for points 0-1, 1-2, 2-3
-void WorldSimApi::simPlotLineStrip(const std::vector<Vector3r>& points, const std::vector<float>& color_rgba, float thickness, float duration, bool is_persistent)
+void WorldSimApi::simPlotLineStrip(const std::vector<Vector3r> &points, const std::vector<float> &color_rgba, float thickness, float duration, bool is_persistent)
 {
-    FColor color = FLinearColor{ color_rgba[0], color_rgba[1], color_rgba[2], color_rgba[3] }.ToFColor(true);
+    FColor color = FLinearColor{color_rgba[0], color_rgba[1], color_rgba[2], color_rgba[3]}.ToFColor(true);
 
-    UAirBlueprintLib::RunCommandOnGameThread([this, &points, &color, thickness, duration, is_persistent]() {
+    UAirBlueprintLib::RunCommandOnGameThread([this, &points, &color, thickness, duration, is_persistent]()
+                                             {
         for (size_t idx = 0; idx != points.size() - 1; ++idx) {
             DrawDebugLine(simmode_->GetWorld(),
                           simmode_->getGlobalNedTransform().fromGlobalNed(points[idx]),
@@ -578,17 +584,17 @@ void WorldSimApi::simPlotLineStrip(const std::vector<Vector3r>& points, const st
                           duration,
                           0,
                           thickness);
-        }
-    },
+        } },
                                              true);
 }
 
 // plot line for points 0-1, 2-3, 4-5... must be even number of points
-void WorldSimApi::simPlotLineList(const std::vector<Vector3r>& points, const std::vector<float>& color_rgba, float thickness, float duration, bool is_persistent)
+void WorldSimApi::simPlotLineList(const std::vector<Vector3r> &points, const std::vector<float> &color_rgba, float thickness, float duration, bool is_persistent)
 {
-    FColor color = FLinearColor{ color_rgba[0], color_rgba[1], color_rgba[2], color_rgba[3] }.ToFColor(true);
+    FColor color = FLinearColor{color_rgba[0], color_rgba[1], color_rgba[2], color_rgba[3]}.ToFColor(true);
 
-    UAirBlueprintLib::RunCommandOnGameThread([this, &points, &color, thickness, duration, is_persistent]() {
+    UAirBlueprintLib::RunCommandOnGameThread([this, &points, &color, thickness, duration, is_persistent]()
+                                             {
         for (int idx = 0; idx < points.size() - 1; idx += 2) {
             DrawDebugLine(simmode_->GetWorld(),
                           simmode_->getGlobalNedTransform().fromGlobalNed(points[idx]),
@@ -598,17 +604,17 @@ void WorldSimApi::simPlotLineList(const std::vector<Vector3r>& points, const std
                           duration,
                           0,
                           thickness);
-        }
-    },
+        } },
                                              true);
 }
 
-void WorldSimApi::simPlotArrows(const std::vector<Vector3r>& points_start, const std::vector<Vector3r>& points_end, const std::vector<float>& color_rgba, float thickness, float arrow_size, float duration, bool is_persistent)
+void WorldSimApi::simPlotArrows(const std::vector<Vector3r> &points_start, const std::vector<Vector3r> &points_end, const std::vector<float> &color_rgba, float thickness, float arrow_size, float duration, bool is_persistent)
 {
     // assert points_start.size() == poinst_end.size()
-    FColor color = FLinearColor{ color_rgba[0], color_rgba[1], color_rgba[2], color_rgba[3] }.ToFColor(true);
+    FColor color = FLinearColor{color_rgba[0], color_rgba[1], color_rgba[2], color_rgba[3]}.ToFColor(true);
 
-    UAirBlueprintLib::RunCommandOnGameThread([this, &points_start, &points_end, &color, thickness, arrow_size, duration, is_persistent]() {
+    UAirBlueprintLib::RunCommandOnGameThread([this, &points_start, &points_end, &color, thickness, arrow_size, duration, is_persistent]()
+                                             {
         for (int idx = 0; idx < points_start.size(); ++idx) {
             DrawDebugDirectionalArrow(simmode_->GetWorld(),
                                       simmode_->getGlobalNedTransform().fromGlobalNed(points_start[idx]),
@@ -619,17 +625,17 @@ void WorldSimApi::simPlotArrows(const std::vector<Vector3r>& points_start, const
                                       duration,
                                       0,
                                       thickness);
-        }
-    },
+        } },
                                              true);
 }
 
-void WorldSimApi::simPlotStrings(const std::vector<std::string>& strings, const std::vector<Vector3r>& positions, float scale, const std::vector<float>& color_rgba, float duration)
+void WorldSimApi::simPlotStrings(const std::vector<std::string> &strings, const std::vector<Vector3r> &positions, float scale, const std::vector<float> &color_rgba, float duration)
 {
     // assert positions.size() == strings.size()
-    FColor color = FLinearColor{ color_rgba[0], color_rgba[1], color_rgba[2], color_rgba[3] }.ToFColor(true);
+    FColor color = FLinearColor{color_rgba[0], color_rgba[1], color_rgba[2], color_rgba[3]}.ToFColor(true);
 
-    UAirBlueprintLib::RunCommandOnGameThread([this, &strings, &positions, &color, scale, duration]() {
+    UAirBlueprintLib::RunCommandOnGameThread([this, &strings, &positions, &color, scale, duration]()
+                                             {
         for (int idx = 0; idx < positions.size(); ++idx) {
             DrawDebugString(simmode_->GetWorld(),
                             simmode_->getGlobalNedTransform().fromGlobalNed(positions[idx]),
@@ -639,14 +645,14 @@ void WorldSimApi::simPlotStrings(const std::vector<std::string>& strings, const 
                             duration,
                             false,
                             scale);
-        }
-    },
+        } },
                                              true);
 }
 
-void WorldSimApi::simPlotTransforms(const std::vector<Pose>& poses, float scale, float thickness, float duration, bool is_persistent)
+void WorldSimApi::simPlotTransforms(const std::vector<Pose> &poses, float scale, float thickness, float duration, bool is_persistent)
 {
-    UAirBlueprintLib::RunCommandOnGameThread([this, &poses, scale, thickness, duration, is_persistent]() {
+    UAirBlueprintLib::RunCommandOnGameThread([this, &poses, scale, thickness, duration, is_persistent]()
+                                             {
         for (const auto& pose : poses) {
             DrawDebugCoordinateSystem(simmode_->GetWorld(),
                                       simmode_->getGlobalNedTransform().fromGlobalNed(pose.position),
@@ -656,17 +662,17 @@ void WorldSimApi::simPlotTransforms(const std::vector<Pose>& poses, float scale,
                                       duration,
                                       0,
                                       thickness);
-        }
-    },
+        } },
                                              true);
 }
 
-void WorldSimApi::simPlotTransformsWithNames(const std::vector<Pose>& poses, const std::vector<std::string>& names, float tf_scale, float tf_thickness, float text_scale, const std::vector<float>& text_color_rgba, float duration)
+void WorldSimApi::simPlotTransformsWithNames(const std::vector<Pose> &poses, const std::vector<std::string> &names, float tf_scale, float tf_thickness, float text_scale, const std::vector<float> &text_color_rgba, float duration)
 {
     // assert poses.size() == names.size()
-    FColor color = FLinearColor{ text_color_rgba[0], text_color_rgba[1], text_color_rgba[2], text_color_rgba[3] }.ToFColor(true);
+    FColor color = FLinearColor{text_color_rgba[0], text_color_rgba[1], text_color_rgba[2], text_color_rgba[3]}.ToFColor(true);
 
-    UAirBlueprintLib::RunCommandOnGameThread([this, &poses, &names, &color, tf_scale, tf_thickness, text_scale, duration]() {
+    UAirBlueprintLib::RunCommandOnGameThread([this, &poses, &names, &color, tf_scale, tf_thickness, text_scale, duration]()
+                                             {
         for (int idx = 0; idx < poses.size(); ++idx) {
             DrawDebugCoordinateSystem(simmode_->GetWorld(),
                                       simmode_->getGlobalNedTransform().fromGlobalNed(poses[idx].position),
@@ -684,17 +690,15 @@ void WorldSimApi::simPlotTransformsWithNames(const std::vector<Pose>& poses, con
                             duration,
                             false,
                             text_scale);
-        }
-    },
+        } },
                                              true);
 }
 
 std::vector<WorldSimApi::MeshPositionVertexBuffersResponse> WorldSimApi::getMeshPositionVertexBuffers() const
 {
     std::vector<WorldSimApi::MeshPositionVertexBuffersResponse> responses;
-    UAirBlueprintLib::RunCommandOnGameThread([&responses]() {
-        responses = UAirBlueprintLib::GetStaticMeshComponents();
-    },
+    UAirBlueprintLib::RunCommandOnGameThread([&responses]()
+                                             { responses = UAirBlueprintLib::GetStaticMeshComponents(); },
                                              true);
     return responses;
 }
@@ -715,12 +719,12 @@ bool WorldSimApi::isRecording() const
     return simmode_->isRecording();
 }
 
-void WorldSimApi::setWind(const Vector3r& wind) const
+void WorldSimApi::setWind(const Vector3r &wind) const
 {
     simmode_->setWind(wind);
 }
 
-void WorldSimApi::setExtForce(const Vector3r& ext_force) const
+void WorldSimApi::setExtForce(const Vector3r &ext_force) const
 {
     simmode_->setExtForce(ext_force);
 }
@@ -729,9 +733,8 @@ std::vector<std::string> WorldSimApi::listVehicles() const
 {
     std::vector<std::string> vehicle_names;
 
-    UAirBlueprintLib::RunCommandOnGameThread([this, &vehicle_names]() {
-        vehicle_names = (simmode_->getApiProvider()->getVehicleSimApis()).keys();
-    },
+    UAirBlueprintLib::RunCommandOnGameThread([this, &vehicle_names]()
+                                             { vehicle_names = (simmode_->getApiProvider()->getVehicleSimApis()).keys(); },
                                              true);
 
     // Remove '' from the list, representing default vehicle
@@ -746,12 +749,13 @@ std::string WorldSimApi::getSettingsString() const
     return msr::airlib::AirSimSettings::singleton().settings_text_;
 }
 
-bool WorldSimApi::testLineOfSightBetweenPoints(const msr::airlib::GeoPoint& lla1, const msr::airlib::GeoPoint& lla2) const
+bool WorldSimApi::testLineOfSightBetweenPoints(const msr::airlib::GeoPoint &lla1, const msr::airlib::GeoPoint &lla2) const
 {
     bool hit;
 
     // We need to run this code on the main game thread, since it iterates over actors
-    UAirBlueprintLib::RunCommandOnGameThread([this, &lla1, &lla2, &hit]() {
+    UAirBlueprintLib::RunCommandOnGameThread([this, &lla1, &lla2, &hit]()
+                                             {
         // This default NedTransform is part of how we anchor the AirSim primary LLA origin at 0, 0, 0 in Unreal
         NedTransform zero_based_ned_transform(FTransform::Identity, UAirBlueprintLib::GetWorldToMetersScale(simmode_));
         FCollisionQueryParams collision_params(SCENE_QUERY_STAT(LineOfSight), true);
@@ -781,9 +785,8 @@ bool WorldSimApi::testLineOfSightBetweenPoints(const msr::airlib::GeoPoint& lla1
                 color = FLinearColor{ 0, 1.0f, 0, 0.4f };
             }
 
-            simmode_->GetWorld()->PersistentLineBatcher->DrawLine(point1, point2, color, SDPG_World, 4, 999999);
-        }
-    },
+            DrawDebugLine(simmode_->GetWorld(), point1, point2, color.ToFColor(true), true, 999999, 0, 4);
+        } },
                                              true);
 
     return !hit;
@@ -794,7 +797,8 @@ std::vector<msr::airlib::GeoPoint> WorldSimApi::getWorldExtents() const
     msr::airlib::GeoPoint lla_min_out;
     msr::airlib::GeoPoint lla_max_out;
     // We need to run this code on the main game thread, since it iterates over actors
-    UAirBlueprintLib::RunCommandOnGameThread([this, &lla_min_out, &lla_max_out]() {
+    UAirBlueprintLib::RunCommandOnGameThread([this, &lla_min_out, &lla_max_out]()
+                                             {
         // This default NedTransform is part of how we anchor the AirSim primary LLA origin at 0, 0, 0 in Unreal
         NedTransform zero_based_ned_transform(FTransform::Identity, UAirBlueprintLib::GetWorldToMetersScale(simmode_));
 
@@ -829,8 +833,7 @@ std::vector<msr::airlib::GeoPoint> WorldSimApi::getWorldExtents() const
         lla_min_out = msr::airlib::EarthUtils::nedToGeodetic(ned, settings.origin_geopoint);
 
         ned = zero_based_ned_transform.toGlobalNed(world_max);
-        lla_max_out = msr::airlib::EarthUtils::nedToGeodetic(ned, settings.origin_geopoint);
-    },
+        lla_max_out = msr::airlib::EarthUtils::nedToGeodetic(ned, settings.origin_geopoint); },
                                              true);
 
     common_utils::Utils::log("Extent min: " + lla_min_out.to_string() + ".  Max: " + lla_max_out.to_string(), common_utils::Utils::kLogLevelInfo);
@@ -841,203 +844,195 @@ std::vector<msr::airlib::GeoPoint> WorldSimApi::getWorldExtents() const
 
     return result;
 }
-msr::airlib::CameraInfo WorldSimApi::getCameraInfo(const CameraDetails& camera_details) const
+msr::airlib::CameraInfo WorldSimApi::getCameraInfo(const CameraDetails &camera_details) const
 {
     msr::airlib::CameraInfo info;
-    const APIPCamera* camera = simmode_->getCamera(camera_details);
-    UAirBlueprintLib::RunCommandOnGameThread([camera, &info]() {
-        info = camera->getCameraInfo();
-    },
+    const APIPCamera *camera = simmode_->getCamera(camera_details);
+    UAirBlueprintLib::RunCommandOnGameThread([camera, &info]()
+                                             { info = camera->getCameraInfo(); },
                                              true);
 
     return info;
 }
 
-void WorldSimApi::setCameraPose(const msr::airlib::Pose& pose, const CameraDetails& camera_details)
+void WorldSimApi::setCameraPose(const msr::airlib::Pose &pose, const CameraDetails &camera_details)
 {
-    APIPCamera* camera = simmode_->getCamera(camera_details);
-    UAirBlueprintLib::RunCommandOnGameThread([camera, &pose]() {
-        camera->setCameraPose(pose);
-    },
+    APIPCamera *camera = simmode_->getCamera(camera_details);
+    UAirBlueprintLib::RunCommandOnGameThread([camera, &pose]()
+                                             { camera->setCameraPose(pose); },
                                              true);
 }
 
-void WorldSimApi::setCameraFoV(float fov_degrees, const CameraDetails& camera_details)
+void WorldSimApi::setCameraFoV(float fov_degrees, const CameraDetails &camera_details)
 {
-    APIPCamera* camera = simmode_->getCamera(camera_details);
-    UAirBlueprintLib::RunCommandOnGameThread([camera, &fov_degrees]() {
-        camera->setCameraFoV(fov_degrees);
-    },
+    APIPCamera *camera = simmode_->getCamera(camera_details);
+    UAirBlueprintLib::RunCommandOnGameThread([camera, &fov_degrees]()
+                                             { camera->setCameraFoV(fov_degrees); },
                                              true);
 }
 
-void WorldSimApi::setDistortionParam(const std::string& param_name, float value, const CameraDetails& camera_details)
+void WorldSimApi::setDistortionParam(const std::string &param_name, float value, const CameraDetails &camera_details)
 {
-    APIPCamera* camera = simmode_->getCamera(camera_details);
-    UAirBlueprintLib::RunCommandOnGameThread([camera, &param_name, &value]() {
-        camera->setDistortionParam(param_name, value);
-    },
+    APIPCamera *camera = simmode_->getCamera(camera_details);
+    UAirBlueprintLib::RunCommandOnGameThread([camera, &param_name, &value]()
+                                             { camera->setDistortionParam(param_name, value); },
                                              true);
 }
 
-std::vector<float> WorldSimApi::getDistortionParams(const CameraDetails& camera_details) const
+std::vector<float> WorldSimApi::getDistortionParams(const CameraDetails &camera_details) const
 {
     std::vector<float> param_values;
-    const APIPCamera* camera = simmode_->getCamera(camera_details);
-    UAirBlueprintLib::RunCommandOnGameThread([camera, &param_values]() {
-        param_values = camera->getDistortionParams();
-    },
+    const APIPCamera *camera = simmode_->getCamera(camera_details);
+    UAirBlueprintLib::RunCommandOnGameThread([camera, &param_values]()
+                                             { param_values = camera->getDistortionParams(); },
                                              true);
 
     return param_values;
 }
 
 std::vector<WorldSimApi::ImageCaptureBase::ImageResponse> WorldSimApi::getImages(
-    const std::vector<ImageCaptureBase::ImageRequest>& requests, const std::string& vehicle_name, bool external) const
+    const std::vector<ImageCaptureBase::ImageRequest> &requests, const std::string &vehicle_name, bool external) const
 {
     std::vector<ImageCaptureBase::ImageResponse> responses;
 
-    const UnrealImageCapture* camera = simmode_->getImageCapture(vehicle_name, external);
+    const UnrealImageCapture *camera = simmode_->getImageCapture(vehicle_name, external);
     camera->getImages(requests, responses);
 
     return responses;
 }
 
-std::vector<uint8_t> WorldSimApi::getImage(ImageCaptureBase::ImageType image_type, const CameraDetails& camera_details) const
+std::vector<uint8_t> WorldSimApi::getImage(ImageCaptureBase::ImageType image_type, const CameraDetails &camera_details) const
 {
     std::vector<ImageCaptureBase::ImageRequest> request{
-        ImageCaptureBase::ImageRequest(camera_details.camera_name, image_type)
-    };
+        ImageCaptureBase::ImageRequest(camera_details.camera_name, image_type)};
 
-    const auto& response = getImages(request, camera_details.vehicle_name, camera_details.external);
+    const auto &response = getImages(request, camera_details.vehicle_name, camera_details.external);
     if (response.size() > 0)
         return response.at(0).image_data_uint8;
     else
         return std::vector<uint8_t>();
 }
 
-//CinemAirSim
-std::vector<std::string> WorldSimApi::getPresetLensSettings(const CameraDetails& camera_details)
+// CinemAirSim
+std::vector<std::string> WorldSimApi::getPresetLensSettings(const CameraDetails &camera_details)
 {
     return simmode_->getCamera(camera_details)->getPresetLensSettings();
 }
 
-std::string WorldSimApi::getLensSettings(const CameraDetails& camera_details)
+std::string WorldSimApi::getLensSettings(const CameraDetails &camera_details)
 {
     return simmode_->getCamera(camera_details)->getLensSettings();
 }
 
-void WorldSimApi::setPresetLensSettings(std::string preset, const CameraDetails& camera_details)
+void WorldSimApi::setPresetLensSettings(std::string preset, const CameraDetails &camera_details)
 {
     return simmode_->getCamera(camera_details)->setPresetLensSettings(preset);
 }
 
-std::vector<std::string> WorldSimApi::getPresetFilmbackSettings(const CameraDetails& camera_details)
+std::vector<std::string> WorldSimApi::getPresetFilmbackSettings(const CameraDetails &camera_details)
 {
     return simmode_->getCamera(camera_details)->getPresetFilmbackSettings();
 }
 
-void WorldSimApi::setPresetFilmbackSettings(std::string preset, const CameraDetails& camera_details)
+void WorldSimApi::setPresetFilmbackSettings(std::string preset, const CameraDetails &camera_details)
 {
     return simmode_->getCamera(camera_details)->setPresetFilmbackSettings(preset);
 }
 
-std::string WorldSimApi::getFilmbackSettings(const CameraDetails& camera_details)
+std::string WorldSimApi::getFilmbackSettings(const CameraDetails &camera_details)
 {
     return simmode_->getCamera(camera_details)->getFilmbackSettings();
 }
 
-float WorldSimApi::setFilmbackSettings(float width, float height, const CameraDetails& camera_details)
+float WorldSimApi::setFilmbackSettings(float width, float height, const CameraDetails &camera_details)
 {
     return simmode_->getCamera(camera_details)->setFilmbackSettings(width, height);
 }
 
-float WorldSimApi::getFocalLength(const CameraDetails& camera_details)
+float WorldSimApi::getFocalLength(const CameraDetails &camera_details)
 {
     return simmode_->getCamera(camera_details)->getFocalLength();
 }
 
-void WorldSimApi::setFocalLength(float focal_length, const CameraDetails& camera_details)
+void WorldSimApi::setFocalLength(float focal_length, const CameraDetails &camera_details)
 {
     return simmode_->getCamera(camera_details)->setFocalLength(focal_length);
 }
 
-void WorldSimApi::enableManualFocus(bool enable, const CameraDetails& camera_details)
+void WorldSimApi::enableManualFocus(bool enable, const CameraDetails &camera_details)
 {
     return simmode_->getCamera(camera_details)->enableManualFocus(enable);
 }
 
-float WorldSimApi::getFocusDistance(const CameraDetails& camera_details)
+float WorldSimApi::getFocusDistance(const CameraDetails &camera_details)
 {
     return simmode_->getCamera(camera_details)->getFocusDistance();
 }
 
-void WorldSimApi::setFocusDistance(float focus_distance, const CameraDetails& camera_details)
+void WorldSimApi::setFocusDistance(float focus_distance, const CameraDetails &camera_details)
 {
     return simmode_->getCamera(camera_details)->setFocusDistance(focus_distance);
 }
 
-float WorldSimApi::getFocusAperture(const CameraDetails& camera_details)
+float WorldSimApi::getFocusAperture(const CameraDetails &camera_details)
 {
     return simmode_->getCamera(camera_details)->getFocusAperture();
 }
 
-void WorldSimApi::setFocusAperture(float focus_aperture, const CameraDetails& camera_details)
+void WorldSimApi::setFocusAperture(float focus_aperture, const CameraDetails &camera_details)
 {
     return simmode_->getCamera(camera_details)->setFocusAperture(focus_aperture);
 }
 
-void WorldSimApi::enableFocusPlane(bool enable, const CameraDetails& camera_details)
+void WorldSimApi::enableFocusPlane(bool enable, const CameraDetails &camera_details)
 {
     return simmode_->getCamera(camera_details)->enableFocusPlane(enable);
 }
 
-std::string WorldSimApi::getCurrentFieldOfView(const CameraDetails& camera_details)
+std::string WorldSimApi::getCurrentFieldOfView(const CameraDetails &camera_details)
 {
     return simmode_->getCamera(camera_details)->getCurrentFieldOfView();
 }
-//End CinemAirSim
+// End CinemAirSim
 
-void WorldSimApi::addDetectionFilterMeshName(ImageCaptureBase::ImageType image_type, const std::string& mesh_name, const CameraDetails& camera_details)
+void WorldSimApi::addDetectionFilterMeshName(ImageCaptureBase::ImageType image_type, const std::string &mesh_name, const CameraDetails &camera_details)
 {
-    const APIPCamera* camera = simmode_->getCamera(camera_details);
+    const APIPCamera *camera = simmode_->getCamera(camera_details);
 
-    UAirBlueprintLib::RunCommandOnGameThread([camera, image_type, &mesh_name]() {
-        camera->getDetectionComponent(image_type, false)->addMeshName(mesh_name);
-    },
+    UAirBlueprintLib::RunCommandOnGameThread([camera, image_type, &mesh_name]()
+                                             { camera->getDetectionComponent(image_type, false)->addMeshName(mesh_name); },
                                              true);
 }
 
-void WorldSimApi::setDetectionFilterRadius(ImageCaptureBase::ImageType image_type, float radius_cm, const CameraDetails& camera_details)
+void WorldSimApi::setDetectionFilterRadius(ImageCaptureBase::ImageType image_type, float radius_cm, const CameraDetails &camera_details)
 {
-    const APIPCamera* camera = simmode_->getCamera(camera_details);
+    const APIPCamera *camera = simmode_->getCamera(camera_details);
 
-    UAirBlueprintLib::RunCommandOnGameThread([camera, image_type, radius_cm]() {
-        camera->getDetectionComponent(image_type, false)->setFilterRadius(radius_cm);
-    },
+    UAirBlueprintLib::RunCommandOnGameThread([camera, image_type, radius_cm]()
+                                             { camera->getDetectionComponent(image_type, false)->setFilterRadius(radius_cm); },
                                              true);
 }
 
-void WorldSimApi::clearDetectionMeshNames(ImageCaptureBase::ImageType image_type, const CameraDetails& camera_details)
+void WorldSimApi::clearDetectionMeshNames(ImageCaptureBase::ImageType image_type, const CameraDetails &camera_details)
 {
-    const APIPCamera* camera = simmode_->getCamera(camera_details);
+    const APIPCamera *camera = simmode_->getCamera(camera_details);
 
-    UAirBlueprintLib::RunCommandOnGameThread([camera, image_type]() {
-        camera->getDetectionComponent(image_type, false)->clearMeshNames();
-    },
+    UAirBlueprintLib::RunCommandOnGameThread([camera, image_type]()
+                                             { camera->getDetectionComponent(image_type, false)->clearMeshNames(); },
                                              true);
 }
 
-std::vector<msr::airlib::DetectionInfo> WorldSimApi::getDetections(ImageCaptureBase::ImageType image_type, const CameraDetails& camera_details)
+std::vector<msr::airlib::DetectionInfo> WorldSimApi::getDetections(ImageCaptureBase::ImageType image_type, const CameraDetails &camera_details)
 {
     std::vector<msr::airlib::DetectionInfo> result;
 
-    const APIPCamera* camera = simmode_->getCamera(camera_details);
-    const NedTransform& ned_transform = camera_details.external
+    const APIPCamera *camera = simmode_->getCamera(camera_details);
+    const NedTransform &ned_transform = camera_details.external
                                             ? simmode_->getGlobalNedTransform()
                                             : simmode_->getVehicleSimApi(camera_details.vehicle_name)->getNedTransform();
 
-    UAirBlueprintLib::RunCommandOnGameThread([camera, image_type, &result, &ned_transform]() {
+    UAirBlueprintLib::RunCommandOnGameThread([camera, image_type, &result, &ned_transform]()
+                                             {
         const TArray<FDetectionInfo>& detections = camera->getDetectionComponent(image_type, false)->getDetections();
         result.resize(detections.Num());
 
@@ -1058,8 +1053,7 @@ std::vector<msr::airlib::DetectionInfo> WorldSimApi::getDetections(ImageCaptureB
             const msr::airlib::Quaternionr& orientation = ned_transform.toNed(detections[i].RelativeTransform.GetRotation());
 
             result[i].relative_pose = Pose(position, orientation);
-        }
-    },
+        } },
                                              true);
 
     return result;

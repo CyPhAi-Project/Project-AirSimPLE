@@ -8,9 +8,10 @@ public class AirSim : ModuleRules
 {
     public AirSim(ReadOnlyTargetRules Target) : base(Target)
     {
-        // PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
-        PCHUsage = PCHUsageMode.NoPCHs;
-
+        PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
+        IncludeOrderVersion = EngineIncludeOrderVersion.Unreal5_6;
+        DefaultBuildSettings = BuildSettingsVersion.V5;
+        CppStandard = CppStandardVersion.Cpp20;
         bEnableExceptions = true;
 
         PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "AssetRegistry", "InputCore", "ImageWrapper", "RenderCore", "RHI", "PhysicsCore", "ChaosVehicles", "Landscape", "CinematicCamera" });
